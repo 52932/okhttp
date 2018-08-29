@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
  * or response.
  */
 public interface Interceptor {
+
   Response intercept(Chain chain) throws IOException;
 
   interface Chain {

@@ -21,7 +21,7 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okio.Sink;
 
-/** Encodes HTTP requests and decodes HTTP responses. */
+/** 编码HTTP请求并解码HTTP响应。 */
 public interface HttpCodec {
   /**
    * The timeout to use while discarding a stream of input data. Since this is used for connection
@@ -30,7 +30,7 @@ public interface HttpCodec {
    */
   int DISCARD_STREAM_TIMEOUT_MILLIS = 100;
 
-  /** Returns an output stream where the request body can be streamed. */
+  /** 返回一个输出流，其中请求主体可以被流化. */
   Sink createRequestBody(Request request, long contentLength);
 
   /** This should update the HTTP engine's sentRequestMillis field. */

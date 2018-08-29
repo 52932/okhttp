@@ -37,20 +37,23 @@ import okhttp3.internal.Util;
  * of calls concurrently.
  */
 public final class Dispatcher {
+  //最大请求数
   private int maxRequests = 64;
+  //每个host的最大请求数
   private int maxRequestsPerHost = 5;
+  //网络请求处于空闲时的回调
   private @Nullable Runnable idleCallback;
 
-  /** Executes calls. Created lazily. */
+  /** 线程池的实现 */
   private @Nullable ExecutorService executorService;
 
-  /** Ready async calls in the order they'll be run. */
+  /** 等待网络请求的异步队列 */
   private final Deque<AsyncCall> readyAsyncCalls = new ArrayDeque<>();
 
-  /** Running asynchronous calls. Includes canceled calls that haven't finished yet. */
+  /** 正在执行网络请求的异步队列. */
   private final Deque<AsyncCall> runningAsyncCalls = new ArrayDeque<>();
 
-  /** Running synchronous calls. Includes canceled calls that haven't finished yet. */
+  /** 正在执行网络请求的同步队列. */
   private final Deque<RealCall> runningSyncCalls = new ArrayDeque<>();
 
   public Dispatcher(ExecutorService executorService) {

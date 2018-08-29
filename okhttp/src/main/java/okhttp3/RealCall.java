@@ -37,6 +37,8 @@ final class RealCall implements Call {
   /**
    * There is a cycle between the {@link Call} and {@link EventListener} that makes this awkward.
    * This will be set after we create the call instance then create the event listener instance.
+   *
+   * 监听OkHttp网络请求各个阶段的事件监听器
    */
   private EventListener eventListener;
 
@@ -44,7 +46,7 @@ final class RealCall implements Call {
   final Request originalRequest;
   final boolean forWebSocket;
 
-  // Guarded by this.
+  // Guarded by this.//判断Call对象是否被执行过的标志变量
   private boolean executed;
 
   private RealCall(OkHttpClient client, Request originalRequest, boolean forWebSocket) {
@@ -73,14 +75,18 @@ final class RealCall implements Call {
     captureCallStackTrace();
     eventListener.callStart(this);
     try {
+      //调用分发器的executed(this)方法
       client.dispatcher().executed(this);
+      //真实的网络请求是在这里处理的
       Response result = getResponseWithInterceptorChain();
       if (result == null) throw new IOException("Canceled");
       return result;
     } catch (IOException e) {
+      //网络请求失败的回调
       eventListener.callFailed(this, e);
       throw e;
     } finally {
+      //网络请求结束
       client.dispatcher().finished(this);
     }
   }
@@ -91,6 +97,7 @@ final class RealCall implements Call {
   }
 
   @Override public void enqueue(Callback responseCallback) {
+    //确保线程安全的情况下通过executed来保证每个Call只被执行一次
     synchronized (this) {
       if (executed) throw new IllegalStateException("Already Executed");
       executed = true;
@@ -183,14 +190,17 @@ final class RealCall implements Call {
   Response getResponseWithInterceptorChain() throws IOException {
     // Build a full stack of interceptors.
     List<Interceptor> interceptors = new ArrayList<>();
-    interceptors.addAll(client.interceptors());
-    interceptors.add(retryAndFollowUpInterceptor);
+    interceptors.addAll(client.interceptors());//在配置 OkHttpClient 时设置的拦截器
+    interceptors.add(retryAndFollowUpInterceptor);//在失败重试以及重定向的拦截器
+    //负责把用户构造的请求转换为发送到服务器的请求、把服务器返回的响应转换为用户友好的响应的 BridgeInterceptor
     interceptors.add(new BridgeInterceptor(client.cookieJar()));
-    interceptors.add(new CacheInterceptor(client.internalCache()));
-    interceptors.add(new ConnectInterceptor(client));
+    interceptors.add(new CacheInterceptor(client.internalCache()));//负责读取缓存直接返回、更新缓存
+    interceptors.add(new ConnectInterceptor(client));//负责和服务器建立连接
     if (!forWebSocket) {
+      //配置 OkHttpClient 时设置的 networkInterceptors
       interceptors.addAll(client.networkInterceptors());
     }
+    //负责向服务器发送请求数据、从服务器读取响应数据
     interceptors.add(new CallServerInterceptor(forWebSocket));
 
     Interceptor.Chain chain = new RealInterceptorChain(interceptors, null, null, null, 0,

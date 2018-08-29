@@ -123,6 +123,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
       Response response;
       boolean releaseConnection = true;
       try {
+        //直接调用了下一个拦截器，然后捕获可能的异常来进行操作
         response = realChain.proceed(request, streamAllocation, null, null);
         releaseConnection = false;
       } catch (RouteException e) {
@@ -157,6 +158,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
 
       Request followUp;
       try {
+        //判断状态码
         followUp = followUpRequest(response, streamAllocation.route());
       } catch (IOException e) {
         streamAllocation.release();

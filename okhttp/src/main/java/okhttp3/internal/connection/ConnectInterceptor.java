@@ -39,6 +39,11 @@ public final class ConnectInterceptor implements Interceptor {
 
     // We need the network to satisfy this request. Possibly for validating a conditional GET.
     boolean doExtensiveHealthChecks = !request.method().equals("GET");
+    /**
+     * 际上建立连接就是创建了一个HttpCodec对象，它将在后面的步骤中被使用，
+     * 它是对 HTTP 协议操作的抽象，有两个实现：Http1Codec和Http2Codec，
+     * 它们分别对应 HTTP/1.1 和 HTTP/2 版本的实现
+     */
     HttpCodec httpCodec = streamAllocation.newStream(client, chain, doExtensiveHealthChecks);
     RealConnection connection = streamAllocation.connection();
 

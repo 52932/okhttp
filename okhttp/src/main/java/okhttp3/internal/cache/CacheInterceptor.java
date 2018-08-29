@@ -51,7 +51,7 @@ public final class CacheInterceptor implements Interceptor {
 
   @Override public Response intercept(Chain chain) throws IOException {
     Response cacheCandidate = cache != null
-        ? cache.get(chain.request())
+        ? cache.get(chain.request())////通过request得到缓存
         : null;
 
     long now = System.currentTimeMillis();
@@ -68,7 +68,7 @@ public final class CacheInterceptor implements Interceptor {
       closeQuietly(cacheCandidate.body()); // The cache candidate wasn't applicable. Close it.
     }
 
-    // If we're forbidden from using the network and the cache is insufficient, fail.
+    // 如果我们禁止使用网络，且缓存为null，失败
     if (networkRequest == null && cacheResponse == null) {
       return new Response.Builder()
           .request(chain.request())
@@ -81,7 +81,7 @@ public final class CacheInterceptor implements Interceptor {
           .build();
     }
 
-    // If we don't need the network, we're done.
+    //没有网络请求，跳过网络，返回缓存
     if (networkRequest == null) {
       return cacheResponse.newBuilder()
           .cacheResponse(stripBody(cacheResponse))
@@ -92,13 +92,13 @@ public final class CacheInterceptor implements Interceptor {
     try {
       networkResponse = chain.proceed(networkRequest);
     } finally {
-      // If we're crashing on I/O or otherwise, don't leak the cache body.
+      //如果我们因为I/O或其他原因崩溃，不要泄漏缓存体
       if (networkResponse == null && cacheCandidate != null) {
         closeQuietly(cacheCandidate.body());
       }
     }
 
-    // If we have a cache response too, then we're doing a conditional get.
+    //如果我们有一个缓存的response，然后我们正在做一个条件GET
     if (cacheResponse != null) {
       if (networkResponse.code() == HTTP_NOT_MODIFIED) {
         Response response = cacheResponse.newBuilder()
@@ -112,6 +112,7 @@ public final class CacheInterceptor implements Interceptor {
 
         // Update the cache after combining headers but before stripping the
         // Content-Encoding header (as performed by initContentStream()).
+        //更新缓存，在剥离content-Encoding之前
         cache.trackConditionalCacheHit();
         cache.update(cacheResponse, response);
         return response;

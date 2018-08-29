@@ -27,6 +27,7 @@ import okhttp3.internal.http.HttpMethod;
 /**
  * An HTTP request. Instances of this class are immutable if their {@link #body} is null or itself
  * immutable.
+ *  封装了url 请求方式 请求头 请求体等网络相关信息
  */
 public final class Request {
   final HttpUrl url;

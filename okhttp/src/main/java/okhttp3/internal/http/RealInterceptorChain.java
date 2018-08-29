@@ -128,6 +128,7 @@ public final class RealInterceptorChain implements Interceptor.Chain {
     calls++;
 
     // If we already have a stream, confirm that the incoming request will use it.
+    //如果我们已经有一个stream。确定即将到来的request会使用它
     if (this.httpCodec != null && !this.connection.supportsUrl(request.url())) {
       throw new IllegalStateException("network interceptor " + interceptors.get(index - 1)
           + " must retain the same host and port");
@@ -140,6 +141,7 @@ public final class RealInterceptorChain implements Interceptor.Chain {
     }
 
     // Call the next interceptor in the chain.
+    //调用链的下一个拦截器
     RealInterceptorChain next = new RealInterceptorChain(interceptors, streamAllocation, httpCodec,
         connection, index + 1, request, call, eventListener, connectTimeout, readTimeout,
         writeTimeout);
