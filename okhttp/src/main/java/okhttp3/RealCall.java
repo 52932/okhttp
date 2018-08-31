@@ -30,6 +30,10 @@ import okhttp3.internal.platform.Platform;
 
 import static okhttp3.internal.platform.Platform.INFO;
 
+/**
+ * 通过建造者模式创建完成HttpClient和Request，将构建的Request转换为Call，在RealCall中进行异步或同步任务；
+ * 最后通过拦截器进行处理；
+ */
 final class RealCall implements Call {
   final OkHttpClient client;
   final RetryAndFollowUpInterceptor retryAndFollowUpInterceptor;
@@ -67,6 +71,11 @@ final class RealCall implements Call {
     return originalRequest;
   }
 
+  /**
+   * 同步请求
+   * @return
+   * @throws IOException
+   */
   @Override public Response execute() throws IOException {
     synchronized (this) {
       if (executed) throw new IllegalStateException("Already Executed");
@@ -96,6 +105,10 @@ final class RealCall implements Call {
     retryAndFollowUpInterceptor.setCallStackTrace(callStackTrace);
   }
 
+  /**
+   * 异步请求
+   * @param responseCallback
+   */
   @Override public void enqueue(Callback responseCallback) {
     //确保线程安全的情况下通过executed来保证每个Call只被执行一次
     synchronized (this) {
@@ -128,6 +141,10 @@ final class RealCall implements Call {
     return retryAndFollowUpInterceptor.streamAllocation();
   }
 
+  /**
+   * 异步请求
+   * execute()同样执行了getResponseWithInterceptorChain()，这样异步任务也会通过 interceptor
+   */
   final class AsyncCall extends NamedRunnable {
     private final Callback responseCallback;
 
@@ -187,6 +204,18 @@ final class RealCall implements Call {
     return originalRequest.url().redact();
   }
 
+  /**
+   * 拦截器的链调用流程下（向下）
+   *  自定义Interceptor(修饰原始的Request)
+   *  RetryAndFollowUpInterceptor
+   *  BridgeInterceptor
+   *  CacheInterceptor
+   *  ConnnectInterceptor
+   *  自定义NetWorkInterceptors
+   *  CallServerInterceptor
+   *
+   *  Response返回(向上)
+   */
   Response getResponseWithInterceptorChain() throws IOException {
     // Build a full stack of interceptors.
     List<Interceptor> interceptors = new ArrayList<>();

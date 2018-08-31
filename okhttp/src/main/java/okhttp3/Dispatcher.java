@@ -129,6 +129,10 @@ public final class Dispatcher {
     this.idleCallback = idleCallback;
   }
 
+  /**
+   * 分发异步请求，添加到自定义的线程池中执行
+   * @param call
+   */
   synchronized void enqueue(AsyncCall call) {
     if (runningAsyncCalls.size() < maxRequests && runningCallsForHost(call) < maxRequestsPerHost) {
       runningAsyncCalls.add(call);

@@ -37,9 +37,16 @@ public final class CallServerInterceptor implements Interceptor {
     this.forWebSocket = forWebSocket;
   }
 
+  /**
+   * 调用HttpCodec完成最终的请求
+   * @param chain
+   * @return 执行完成后 并没有调用RealIntercept的intercept方法，而是逆向返回response对象
+   * @throws IOException
+   */
   @Override public Response intercept(Chain chain) throws IOException {
     RealInterceptorChain realChain = (RealInterceptorChain) chain;
-    HttpCodec httpCodec = realChain.httpStream();
+    //Okhttp1Codec okhttp2Codec实现了它，对应这个http1 http2.x的请求
+    HttpCodec httpCodec = realChain.httpStream();//codec内部的请求 都依赖于okio(对Socket的封装 )
     StreamAllocation streamAllocation = realChain.streamAllocation();
     RealConnection connection = (RealConnection) realChain.connection();
     Request request = realChain.request();

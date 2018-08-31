@@ -455,11 +455,11 @@ public class OkHttpClient implements Cloneable, Call.Factory, WebSocket.Factory 
     int pingInterval;
 
     public Builder() {
-      dispatcher = new Dispatcher();
-      protocols = DEFAULT_PROTOCOLS;
-      connectionSpecs = DEFAULT_CONNECTION_SPECS;
+      dispatcher = new Dispatcher();//默认分发器
+      protocols = DEFAULT_PROTOCOLS;//默认协议
+      connectionSpecs = DEFAULT_CONNECTION_SPECS;//
       eventListenerFactory = EventListener.factory(EventListener.NONE);
-      proxySelector = ProxySelector.getDefault();
+      proxySelector = ProxySelector.getDefault();//默认代理选择
       cookieJar = CookieJar.NO_COOKIES;
       socketFactory = SocketFactory.getDefault();
       hostnameVerifier = OkHostnameVerifier.INSTANCE;
@@ -471,8 +471,8 @@ public class OkHttpClient implements Cloneable, Call.Factory, WebSocket.Factory 
       followSslRedirects = true;
       followRedirects = true;
       retryOnConnectionFailure = true;
-      connectTimeout = 10_000;
-      readTimeout = 10_000;
+      connectTimeout = 10_000;//默认连接超时时间10s
+      readTimeout = 10_000;//读取超时时间10s
       writeTimeout = 10_000;
       pingInterval = 0;
     }
