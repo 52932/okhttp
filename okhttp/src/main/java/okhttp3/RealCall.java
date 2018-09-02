@@ -215,6 +215,11 @@ final class RealCall implements Call {
    *  CallServerInterceptor
    *
    *  Response返回(向上)
+   *
+   *  -------
+   *  开发这自定义的interceptor和networkInterceptor
+   *  普通interceptor：对发出去的请求做最初的处理，对最终得到的响应做处理
+   *  networkInterceptor：对发出去的请求做最后的处理，对收到的响应做最初的处理
    */
   Response getResponseWithInterceptorChain() throws IOException {
     // Build a full stack of interceptors.

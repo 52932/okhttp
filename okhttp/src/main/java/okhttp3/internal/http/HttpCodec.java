@@ -16,6 +16,7 @@
 package okhttp3.internal.http;
 
 import java.io.IOException;
+
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
@@ -39,7 +40,9 @@ public interface HttpCodec {
   /** Flush the request to the underlying socket. */
   void flushRequest() throws IOException;
 
-  /** Flush the request to the underlying socket and signal no more bytes will be transmitted. */
+  /** Flush the request to the underlying socket and signal no more bytes will be transmitted.
+   * 将请求刷新到基础套接字，不再发送任何字节。
+   * */
   void finishRequest() throws IOException;
 
   /**

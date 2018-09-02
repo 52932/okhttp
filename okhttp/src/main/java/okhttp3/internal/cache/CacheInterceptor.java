@@ -41,7 +41,12 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static okhttp3.internal.Util.closeQuietly;
 import static okhttp3.internal.Util.discard;
 
-/** Serves requests from the cache and writes responses to the cache. */
+/**
+ * HTTP 协议中的缓存机制，其主要功能如下：
+ * 从缓存中读取缓存，并创建缓存策略对象
+ * 根据创建的缓存策略对象，从缓存、网络获取响应并生成最终的响应对象
+ * 更新缓存内容，并返回响应对象
+ */
 public final class CacheInterceptor implements Interceptor {
   final InternalCache cache;
 
@@ -49,13 +54,21 @@ public final class CacheInterceptor implements Interceptor {
     this.cache = cache;
   }
 
-  @Override public Response intercept(Chain chain) throws IOException {
+  /**
+   *
+   * @param chain
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public Response intercept(Chain chain) throws IOException {
     Response cacheCandidate = cache != null
-        ? cache.get(chain.request())////通过request得到缓存
+        ? cache.get(chain.request())////通过request得到候选缓存
         : null;
 
     long now = System.currentTimeMillis();
 
+    // 创建缓存策略对象，并从中得到请求和响应
     CacheStrategy strategy = new CacheStrategy.Factory(now, chain.request(), cacheCandidate).get();
     Request networkRequest = strategy.networkRequest;
     Response cacheResponse = strategy.cacheResponse;
@@ -68,7 +81,7 @@ public final class CacheInterceptor implements Interceptor {
       closeQuietly(cacheCandidate.body()); // The cache candidate wasn't applicable. Close it.
     }
 
-    // 如果我们禁止使用网络，且缓存为null，失败
+    // 如果没有网络，且缓存为null，创建504的错误码 并返回
     if (networkRequest == null && cacheResponse == null) {
       return new Response.Builder()
           .request(chain.request())
@@ -81,7 +94,7 @@ public final class CacheInterceptor implements Interceptor {
           .build();
     }
 
-    //没有网络请求，跳过网络，返回缓存
+    //没有网络请求 且 有缓存，跳过网络，返回缓存
     if (networkRequest == null) {
       return cacheResponse.newBuilder()
           .cacheResponse(stripBody(cacheResponse))
@@ -90,15 +103,24 @@ public final class CacheInterceptor implements Interceptor {
 
     Response networkResponse = null;
     try {
+      //前面的条件都不满足,则发送给  ConnectInterceptor 进行网络处理
       networkResponse = chain.proceed(networkRequest);
     } finally {
-      //如果我们因为I/O或其他原因崩溃，不要泄漏缓存体
+      //如果在Connectinterceptor中发送了错误导致了 响应 为空，则释放掉缓存
       if (networkResponse == null && cacheCandidate != null) {
         closeQuietly(cacheCandidate.body());
       }
     }
 
-    //如果我们有一个缓存的response，然后我们正在做一个条件GET
+    /**
+     * 304 表示资源没有更改过。
+     * HttpEngine的invalidate()方法用于判断是采用缓存还是网络的Response
+     * 如果netWork.code = 304，则直接使用缓存数据。
+     * 如果netWork.code != 304, 会继续去判断缓存和网络的Last-Modified。
+     * 缓存的最后修改时间更大，就采用缓存。
+     * 网络的最后修改时间更大，就采用网络数据。
+     */
+    // 如果得到的缓存响应不是空的，并且网络响应的状态码为 304，则根据缓存响应结果生成最终的响应并返回
     if (cacheResponse != null) {
       if (networkResponse.code() == HTTP_NOT_MODIFIED) {
         Response response = cacheResponse.newBuilder()
@@ -112,7 +134,7 @@ public final class CacheInterceptor implements Interceptor {
 
         // Update the cache after combining headers but before stripping the
         // Content-Encoding header (as performed by initContentStream()).
-        //更新缓存，在剥离content-Encoding之前
+        //更新缓存中的response
         cache.trackConditionalCacheHit();
         cache.update(cacheResponse, response);
         return response;
@@ -121,11 +143,13 @@ public final class CacheInterceptor implements Interceptor {
       }
     }
 
+    // 根据网络请求响应生成最终的响应
     Response response = networkResponse.newBuilder()
         .cacheResponse(stripBody(cacheResponse))
         .networkResponse(stripBody(networkResponse))
         .build();
 
+    // 如果缓存对象不为空，则将响应加入到缓存中
     if (cache != null) {
       if (HttpHeaders.hasBody(response) && CacheStrategy.isCacheable(response, networkRequest)) {
         // Offer this request to the cache.

@@ -29,7 +29,11 @@ import okio.ForwardingSink;
 import okio.Okio;
 import okio.Sink;
 
-/** This is the last interceptor in the chain. It makes a network call to the server. */
+/**
+ * 主要的功能就是：
+ * 遵循 HTTP 协议规范，通过 HttpCodec 对象写入请求头、请求主体、读取响应头和响应主体
+ * 生成最初的响应对象并返回
+ */
 public final class CallServerInterceptor implements Interceptor {
   private final boolean forWebSocket;
 
@@ -43,7 +47,8 @@ public final class CallServerInterceptor implements Interceptor {
    * @return 执行完成后 并没有调用RealIntercept的intercept方法，而是逆向返回response对象
    * @throws IOException
    */
-  @Override public Response intercept(Chain chain) throws IOException {
+  @Override
+  public Response intercept(Chain chain) throws IOException {
     RealInterceptorChain realChain = (RealInterceptorChain) chain;
     //Okhttp1Codec okhttp2Codec实现了它，对应这个http1 http2.x的请求
     HttpCodec httpCodec = realChain.httpStream();//codec内部的请求 都依赖于okio(对Socket的封装 )
@@ -52,16 +57,18 @@ public final class CallServerInterceptor implements Interceptor {
     Request request = realChain.request();
 
     long sentRequestMillis = System.currentTimeMillis();
-
+    // 向 HttpCodec 对象中写入请求头部信息
     realChain.eventListener().requestHeadersStart(realChain.call());
     httpCodec.writeRequestHeaders(request);
     realChain.eventListener().requestHeadersEnd(realChain.call(), request);
 
     Response.Builder responseBuilder = null;
+    // 判断该请求的请求方法是否允许被发送请求体，请求体是否为空
     if (HttpMethod.permitsRequestBody(request.method()) && request.body() != null) {
       // If there's a "Expect: 100-continue" header on the request, wait for a "HTTP/1.1 100
       // Continue" response before transmitting the request body. If we don't get that, return
       // what we did get (such as a 4xx response) without ever transmitting the request body.
+      // 若在请求头部中存在 ”Expect: 100-continue“，先不发送请求主体，只有收到 ”100-continue“ 响应报文才会将请求主体发送出去。
       if ("100-continue".equalsIgnoreCase(request.header("Expect"))) {
         httpCodec.flushRequest();
         realChain.eventListener().responseHeadersStart(realChain.call());
@@ -69,9 +76,10 @@ public final class CallServerInterceptor implements Interceptor {
       }
 
       if (responseBuilder == null) {
-        // Write the request body if the "Expect: 100-continue" expectation was met.
+        // 如果满足了“Expect: 100-continue”，编写请求主体。
         realChain.eventListener().requestBodyStart(realChain.call());
         long contentLength = request.body().contentLength();
+
         CountingSink requestBodyOut =
             new CountingSink(httpCodec.createRequestBody(request, contentLength));
         BufferedSink bufferedRequestBody = Okio.buffer(requestBodyOut);
@@ -95,14 +103,20 @@ public final class CallServerInterceptor implements Interceptor {
       responseBuilder = httpCodec.readResponseHeaders(false);
     }
 
+    // 创建请求响应对象
     Response response = responseBuilder
         .request(request)
         .handshake(streamAllocation.connection().handshake())
         .sentRequestAtMillis(sentRequestMillis)
         .receivedResponseAtMillis(System.currentTimeMillis())
         .build();
-
+    //获取响应码，后续根据响应码做一些处理
     int code = response.code();
+    /**
+     * 100 Continue
+     * 客户端应当继续发送请求。这个临时响应是用来通知客户端它的部分请求已经被服务器接收，且仍未被拒绝。
+     * 客户端应当继续发送请求的剩余部分，或者如果请求已经完成，忽略这个响应。服务器必须在请求完成后向客户端发送一个最终响应。
+     */
     if (code == 100) {
       // server sent a 100-continue even though we did not request one.
       // try again to read the actual response
@@ -115,28 +129,33 @@ public final class CallServerInterceptor implements Interceptor {
               .receivedResponseAtMillis(System.currentTimeMillis())
               .build();
 
-      code = response.code();
+      code = response.code();//处理完100，重新获取一次code
     }
 
     realChain.eventListener()
             .responseHeadersEnd(realChain.call(), response);
-
+    // 判断是否返回一个空的响应
     if (forWebSocket && code == 101) {
       // Connection is upgrading, but we need to ensure interceptors see a non-null response body.
       response = response.newBuilder()
           .body(Util.EMPTY_RESPONSE)
           .build();
-    } else {
+    } else {// 读取响应中的响应体信息
       response = response.newBuilder()
           .body(httpCodec.openResponseBody(response))
           .build();
     }
-
+    // 判断是否关闭长连接
     if ("close".equalsIgnoreCase(response.request().header("Connection"))
         || "close".equalsIgnoreCase(response.header("Connection"))) {
       streamAllocation.noNewStreams();
     }
 
+    /**
+     * 204 和 205
+     * 服务器处理了请求 但是没有返回任何信息
+     */
+    // 如果响应的状态码为 204 和 205 并且响应体不为空，则抛出异常
     if ((code == 204 || code == 205) && response.body().contentLength() > 0) {
       throw new ProtocolException(
           "HTTP " + code + " had non-zero Content-Length: " + response.body().contentLength());

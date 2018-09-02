@@ -18,6 +18,7 @@ package okhttp3.internal.http;
 
 import java.io.IOException;
 import java.util.List;
+
 import okhttp3.Cookie;
 import okhttp3.CookieJar;
 import okhttp3.Headers;
@@ -37,7 +38,11 @@ import static okhttp3.internal.Util.hostHeader;
  * request. Then it proceeds to call the network. Finally it builds a user response from the network
  * response.
  *
- * 负责把用户构造的请求转换为发送到服务器的请求、把服务器返回的响应转换为用户友好的响应的
+ * 负责把用户构造的请求转换为发送到服务器的请求、把服务器返回的响应转换为用户友好的响应的；
+ *
+ * 设置一些请求和响应首部，如：Content-Type、Content-Length、Host 等常见的请求和响应首部。
+ * 处理 HTTP 请求和响应中的 Cookie
+ * 如果在请求中设置了编码，要从响应流中解码
  */
 public final class BridgeInterceptor implements Interceptor {
   private final CookieJar cookieJar;
@@ -51,14 +56,14 @@ public final class BridgeInterceptor implements Interceptor {
     Request.Builder requestBuilder = userRequest.newBuilder();
     //检查request。将用户的request转换为发送到server的请求
     RequestBody body = userRequest.body();
-    if (body != null) {
+    if (body != null) { // 在请求中设置实体首部 Content-Type
       MediaType contentType = body.contentType();
       if (contentType != null) {
         requestBuilder.header("Content-Type", contentType.toString());
       }
 
       long contentLength = body.contentLength();
-      if (contentLength != -1) {
+      if (contentLength != -1) {// 在请求中设置实体首部 Content-Length 和 Transfer-Encoding
         requestBuilder.header("Content-Length", Long.toString(contentLength));
         requestBuilder.removeHeader("Transfer-Encoding");
       } else {
@@ -75,14 +80,14 @@ public final class BridgeInterceptor implements Interceptor {
       requestBuilder.header("Connection", "Keep-Alive");
     }
 
-    // If we add an "Accept-Encoding: gzip" header field we're responsible for also decompressing
-    // the transfer stream.
+    // 设置Accept-Encoding
     boolean transparentGzip = false;
     if (userRequest.header("Accept-Encoding") == null && userRequest.header("Range") == null) {
       transparentGzip = true;
       requestBuilder.header("Accept-Encoding", "gzip");
     }
 
+    //从响应这个拿到cookie
     List<Cookie> cookies = cookieJar.loadForRequest(userRequest.url());
     if (!cookies.isEmpty()) {
       requestBuilder.header("Cookie", cookieHeader(cookies));
@@ -99,6 +104,7 @@ public final class BridgeInterceptor implements Interceptor {
     Response.Builder responseBuilder = networkResponse.newBuilder()
         .request(userRequest);
 
+    // 如果之前在请求中设置了 "Accept-Encoding: gzip" 编码，则需要对响应流进行解码操作并移除响应中的首部字段 “Content-Encoding” 和 “Content-Length”
     if (transparentGzip
         && "gzip".equalsIgnoreCase(networkResponse.header("Content-Encoding"))
         && HttpHeaders.hasBody(networkResponse)) {

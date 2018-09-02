@@ -57,6 +57,11 @@ import static okhttp3.internal.http.StatusLine.HTTP_TEMP_REDIRECT;
  * This interceptor recovers from failures and follows redirects as necessary. It may throw an
  * {@link IOException} if the call was canceled.
  */
+
+
+/**
+ * 主要负责实现 HTTP 协议中的认证质询、重定向和超时重试等协议机制。
+ */
 public final class RetryAndFollowUpInterceptor implements Interceptor {
   /**
    * How many redirects and auth challenges should we attempt? Chrome follows 21 redirects; Firefox,
@@ -114,6 +119,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
 
     int followUpCount = 0;
     Response priorResponse = null;
+    //启动一个while死循环，判断是否已经取消，若已取消 则抛io异常
     while (true) {
       if (canceled) {
         streamAllocation.release();
@@ -127,27 +133,28 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
         response = realChain.proceed(request, streamAllocation, null, null);
         releaseConnection = false;
       } catch (RouteException e) {
-        // The attempt to connect via a route failed. The request will not have been sent.
+        // 如果进入 RouteException 路由异常，则尝试是否可以重新进行请求，若可以则从头开始新的请求
+        if (!recover(e.getLastConnectException(), false, request)) {
         if (!recover(e.getLastConnectException(), streamAllocation, false, request)) {
           throw e.getFirstConnectException();
         }
         releaseConnection = false;
         continue;
       } catch (IOException e) {
-        // An attempt to communicate with a server failed. The request may have been sent.
+          // 若是进入 IOException IO异常，若可以重新尝试请求，则从头开始新的请求
         boolean requestSendStarted = !(e instanceof ConnectionShutdownException);
         if (!recover(e, streamAllocation, requestSendStarted, request)) throw e;
         releaseConnection = false;
         continue;
       } finally {
-        // We're throwing an unchecked exception. Release any resources.
+        // 调用下一个拦截器时 没有抛出异常  释放资源
         if (releaseConnection) {
           streamAllocation.streamFailed(null);
           streamAllocation.release();
         }
       }
 
-      // Attach the prior response if it exists. Such responses never have a body.
+      // 如果之前发生过重定向，并且 priorResponse 不为空，则创建新的 响应对象，并将其 body 置位空
       if (priorResponse != null) {
         response = response.newBuilder()
             .priorResponse(priorResponse.newBuilder()
@@ -158,13 +165,15 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
 
       Request followUp;
       try {
-        //判断状态码
+        // 添加认证需要的头部，处理重定向或超时重试，得到新的请求
+        // followUpRequest() 方法涉及到 HTTP 中认证质询、重定向和重试等协议的实现
         followUp = followUpRequest(response, streamAllocation.route());
       } catch (IOException e) {
         streamAllocation.release();
         throw e;
       }
 
+        // 若 followUp 重试请求为空，则当前请求结束，并返回当前的响应
       if (followUp == null) {
         if (!forWebSocket) {
           streamAllocation.release();
@@ -173,7 +182,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
       }
 
       closeQuietly(response.body());
-
+      // 若重定向、认证质询、重试次数超过 MAX_FOLLOW_UPS，则抛出 ProtocolException 异常
       if (++followUpCount > MAX_FOLLOW_UPS) {
         streamAllocation.release();
         throw new ProtocolException("Too many follow-up requests: " + followUpCount);
@@ -183,7 +192,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
         streamAllocation.release();
         throw new HttpRetryException("Cannot retry streamed HTTP body", response.code());
       }
-
+      // 判断是否是相同的连接，若不相同则释放 streamAllocation，并重新创建新的 streamAllocation 对象
       if (!sameConnection(response, followUp.url())) {
         streamAllocation.release();
         streamAllocation = new StreamAllocation(client.connectionPool(),
@@ -408,8 +417,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
   }
 
   /**
-   * Returns true if an HTTP request for {@code followUp} can reuse the connection used by this
-   * engine.
+   * 如果HTTP请求{@code followUp}可以重用此引擎使用的连接，则返回true。
    */
   private boolean sameConnection(Response response, HttpUrl followUp) {
     HttpUrl url = response.request().url();
