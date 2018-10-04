@@ -170,6 +170,7 @@ public final class CacheStrategy {
      * Returns a strategy to satisfy {@code request} using the a cached response {@code response}.
      */
     public CacheStrategy get() {
+      //获取缓存策略类并返回
       CacheStrategy candidate = getCandidate();
 
       if (candidate.networkRequest != null && request.cacheControl().onlyIfCached()) {

@@ -133,6 +133,9 @@ import okio.Source;
  * <p>The {@link CacheControl} class can configure request caching directives and parse response
  * caching directives. It even offers convenient constants {@link CacheControl#FORCE_NETWORK} and
  * {@link CacheControl#FORCE_CACHE} that address the use cases above.
+ *
+ * 对DiskLruCache的封装
+ * 对本地缓存进行增删改查操作
  */
 public final class Cache implements Closeable, Flushable {
   private static final int VERSION = 201105;

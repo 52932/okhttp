@@ -55,10 +55,9 @@ public final class CacheInterceptor implements Interceptor {
   }
 
   /**
-   *
-   * @param chain
-   * @return
-   * @throws IOException
+   * 去拦截请求处理缓存相关逻辑，其中使用缓存策略器CacheStrategy类来取出与缓存相关的数据，
+   * 若缓存中有相应数据则取出，若缓存中数据不存在或过期则重新向服务器发出请求。当前本地有指定缓存时，
+   * 重新请求的资源数据会被同步到当前本地中，涉及到的同步类是Cache、DiskLruCache类
    */
   @Override
   public Response intercept(Chain chain) throws IOException {
@@ -68,7 +67,12 @@ public final class CacheInterceptor implements Interceptor {
 
     long now = System.currentTimeMillis();
 
-    // 创建缓存策略对象，并从中得到请求和响应
+    /**
+     * 创建缓存策略对象，并从中得到请求和响应
+     * now 当前请求资源时间，用于校验缓存是否过期
+     * chain.request() ： 一个Request对象，当前请求头的参数
+     * cacheCandidate ： 一个Response对象，如果当前的缓存目录（这里的缓存目录是cache，类型为InternalCache）不等于null，则从缓存目录中取出对应请求的Response数据。
+     */
     CacheStrategy strategy = new CacheStrategy.Factory(now, chain.request(), cacheCandidate).get();
     Request networkRequest = strategy.networkRequest;
     Response cacheResponse = strategy.cacheResponse;

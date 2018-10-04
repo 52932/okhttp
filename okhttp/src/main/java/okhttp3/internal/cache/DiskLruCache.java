@@ -83,6 +83,10 @@ import static okhttp3.internal.platform.Platform.WARN;
  * corresponding entries will be dropped from the cache. If an error occurs while writing a cache
  * value, the edit will fail silently. Callers should handle other problems by catching {@code
  * IOException} and responding appropriately.
+ *
+ *
+ *
+ * 维护着文件的创建，清理，读取。内部有清理线程池
  */
 public final class DiskLruCache implements Closeable, Flushable {
   static final String JOURNAL_FILE = "journal";
@@ -827,7 +831,7 @@ public final class DiskLruCache implements Closeable, Flushable {
     }
   }
 
-  /** Edits the values for an entry. */
+  /** Edits the values for an entry. 添加了同步锁，并对FileSystem进行高度封装*/
   public final class Editor {
     final Entry entry;
     final boolean[] written;
@@ -954,6 +958,9 @@ public final class DiskLruCache implements Closeable, Flushable {
     }
   }
 
+  /**
+   * 维护着key对应的多个文件
+   */
   private final class Entry {
     final String key;
 
